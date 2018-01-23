@@ -39,14 +39,14 @@ function video_player(video, name = "test")
     path = joinpath(dir, "$name.mkv")
     io, process = open(`ffmpeg -loglevel quiet -f rawvideo -pixel_format rgb24 -r 24 -s:v $(xdim)x$(ydim) -i pipe:0 -vf vflip -y $path`, "w")
     for i = 1:nframes
-        frame = RGB{N0f8}.(Gray.(view(video, :, :, i)))
+        frame = RGB{N0f8}.(Gray.(view(video, :, size(video, 2):-1:1, i)))
         write(io, frame)
     end
     close(io)
     sleep(1)
     mp4path = joinpath(dir, "$(name).mp4")
 
-    run(`ffmpeg -loglevel quiet -y -i $(path) -c:v libx264 -preset slow -crf 22 -pix_fmt yuv420p -c:a libvo_aacenc -b:a 128k $(mp4path)`)
+    run(`ffmpeg -loglevel quiet -y -i $(path) -c:v libx264 -preset slow -crf 22 -pix_fmt yuv420p -c:a libvo_aacenc -b:a 128k -y $(mp4path)`)
     dom"video"(
         dom"source"(attributes = Dict(
             :src => "files/assets/$(name).mp4", :type => "video/mp4",
@@ -59,14 +59,14 @@ end
 package_dir() = joinpath(@__DIR__, "..")
 
 
-function videobox(video, name)
+function videobox(video, name, width)
     dom"div"(
         vbox(dom"div"(name), video),
-        style = Dict(:outline => "1px solid #555", :width => "200px", :padding => "0.5em")
+        style = Dict(:outline => "1px solid #555", :width => "$(width)px", :padding => "0.5em")
     )
 end
 
-function playvideo(videos::Vector{Array{T, 3}}, names = ["video $i" for i = 1:length(videos)]; frames_per_second = 24) where T <: AbstractFloat
+function playvideo(videos::Vector{Array{T, 3}}, names = ["video $i" for i = 1:length(videos)]; frames_per_second = 24, width = 500) where T <: AbstractFloat
     w = Widget()
     nvideos = length(videos)
     nframes = size(first(videos), 3)
@@ -91,7 +91,7 @@ function playvideo(videos::Vector{Array{T, 3}}, names = ["video $i" for i = 1:le
         $(set_time)($unique_name, $nvideos, val, $(nframes))
     end)
     video_players = w.(video_player.(videos, [string(unique_name, i) for i = 1:nvideos]))
-    vbox(hbox(w(button), s), hbox(videobox.(video_players, names)...))
+    vbox(hbox(w(button), s), hbox(videobox.(video_players, names, width)...))
 end
 
 export playvideo
