@@ -2,14 +2,6 @@ module WebPlayer
 
 using Colors, FixedPointNumbers, CSSUtil, WebIO, InteractNext
 
-function copyframe!(frame, video, i)
-    @inbounds for y = 1:size(frame, 2), x = 1:size(frame, 1)
-        gray = video[x, y, i]
-        frame[x, y] = RGB{N0f8}(gray, gray, gray)
-    end
-    frame
-end
-
 const set_play = js"""
 function set_play(name, nvideos){
     var video;
@@ -35,32 +27,29 @@ function set_time(name, nvideos, val, nframes){
         var t = (val / nframes) * video.duration;
         video.currentTime = t;
     }
+    return;
 }
 """
 
 function video_player(video, name = "test")
-    dir = pwd()
+    dir = joinpath(pwd(), "assets")
+    isdir(dir) || mkdir("assets")
     xdim, ydim, nframes = size(video)
     frame = Matrix{RGB{N0f8}}(xdim, ydim)
     path = joinpath(dir, "$name.mkv")
-    io, process = open(`ffmpeg -loglevel panic -f rawvideo -pixel_format rgb24 -r 24 -s:v $(xdim)x$(ydim) -i pipe:0 -vf vflip -y $path`, "w")
+    io, process = open(`ffmpeg -loglevel quiet -f rawvideo -pixel_format rgb24 -r 24 -s:v $(xdim)x$(ydim) -i pipe:0 -vf vflip -y $path`, "w")
     for i = 1:nframes
-        copyframe!(frame, video, i)
+        frame = RGB{N0f8}.(Gray.(view(video, :, :, i)))
         write(io, frame)
     end
     close(io)
     sleep(1)
-    webmpath = joinpath(dir, "$(name).webm")
-    run(`ffmpeg -loglevel quiet -i $(path) -c:v libvpx-vp9 -threads 16 -b:v 4000k -c:a libvorbis -threads 16 -vf scale=iw:ih -y $(webmpath)`)
     mp4path = joinpath(dir, "$(name).mp4")
-    run(`ffmpeg -loglevel quiet -i $(path) -vcodec copy -acodec copy -y $(mp4path)`)
 
+    run(`ffmpeg -loglevel quiet -y -i $(path) -c:v libx264 -preset slow -crf 22 -pix_fmt yuv420p -c:a libvo_aacenc -b:a 128k $(mp4path)`)
     dom"video"(
         dom"source"(attributes = Dict(
-            :src => "files/$(name).webm", :type => "video/webm",
-        )),
-        dom"source"(attributes = Dict(
-            :src => "files/$(name).mp4", :type => "video/mp4",
+            :src => "files/assets/$(name).mp4", :type => "video/mp4",
         )),
         id = name,
         attributes = Dict(:loop => "")
@@ -89,7 +78,8 @@ function playvideo(videos::Vector{Array{T, 3}}, names = ["video $i" for i = 1:le
         events = Dict(
             "click" => @js function ()
                 @var tnorm = $(set_play)($unique_name, $nvideos)
-                $timestep[] = Math.round($nframes * tnorm)
+                $timestep[] = Math.round($(nframes) * tnorm)
+                return
             end),
     )
     s = dom"div"(
@@ -105,5 +95,6 @@ function playvideo(videos::Vector{Array{T, 3}}, names = ["video $i" for i = 1:le
 end
 
 export playvideo
+
 
 end # module
