@@ -67,6 +67,9 @@ function video_player(video, name = "test")
     )
 end
 
+package_dir() = joinpath(@__DIR__, "..")
+
+
 function videobox(video, name)
     dom"div"(
         vbox(dom"div"(name), video),
