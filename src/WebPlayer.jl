@@ -31,7 +31,7 @@ function set_time(name, nvideos, val, nframes){
 }
 """
 
-function video_player(video, name = "test")
+function video_player(video, name = "test", width)
     dir = joinpath(pwd(), "assets")
     isdir(dir) || mkdir("assets")
     xdim, ydim, nframes = size(video)
@@ -45,14 +45,14 @@ function video_player(video, name = "test")
     close(io)
     sleep(1)
     mp4path = joinpath(dir, "$(name).mp4")
-
+    rm(mp4path, force = true)
     run(`ffmpeg -loglevel quiet -y -i $(path) -c:v libx264 -preset slow -crf 22 -pix_fmt yuv420p -c:a libvo_aacenc -b:a 128k -y $(mp4path)`)
     dom"video"(
         dom"source"(attributes = Dict(
             :src => "files/assets/$(name).mp4", :type => "video/mp4",
         )),
         id = name,
-        attributes = Dict(:loop => "")
+        attributes = Dict(:loop => "", :width = "100%")
     )
 end
 
