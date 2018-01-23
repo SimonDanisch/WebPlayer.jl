@@ -3,12 +3,9 @@ module WebPlayer
 using Colors, FixedPointNumbers, CSSUtil, WebIO, InteractNext
 
 function copyframe!(frame, video, i)
-    sourceframe = video[i]
     @inbounds for y = 1:size(frame, 2), x = 1:size(frame, 1)
-        r = sourceframe[x, y, 1]
-        g = sourceframe[x, y, 2]
-        b = sourceframe[x, y, 3]
-        frame[x, y] = RGB{N0f8}(r, g, b)
+        gray = video[x, y, i]
+        frame[x, y] = RGB{N0f8}(gray, gray, gray)
     end
     frame
 end
@@ -43,16 +40,16 @@ function set_time(name, nvideos, val, nframes){
 
 function video_player(video, name = "test")
     dir = pwd()
-    f1 = first(video)
-    xdim, ydim = size(f1)
+    xdim, ydim, nframes = size(video)
     frame = Matrix{RGB{N0f8}}(xdim, ydim)
-
     path = joinpath(dir, "$name.mkv")
     io, process = open(`ffmpeg -loglevel panic -f rawvideo -pixel_format rgb24 -r 24 -s:v $(xdim)x$(ydim) -i pipe:0 -vf vflip -y $path`, "w")
-    for i = 1:length(video)
+    for i = 1:nframes
         copyframe!(frame, video, i)
         write(io, frame)
     end
+    close(io)
+    sleep(1)
     webmpath = joinpath(dir, "$(name).webm")
     run(`ffmpeg -loglevel quiet -i $(path) -c:v libvpx-vp9 -threads 16 -b:v 4000k -c:a libvorbis -threads 16 -vf scale=iw:ih -y $(webmpath)`)
     mp4path = joinpath(dir, "$(name).mp4")
@@ -77,10 +74,10 @@ function videobox(video, name)
     )
 end
 
-function playvideo(videos::Vector{Vector{Array{T, 3}}}, names = ["video $i" for i = 1:length(videos)]; frames_per_second = 24) where T <: AbstractFloat
+function playvideo(videos::Vector{Array{T, 3}}, names = ["video $i" for i = 1:length(videos)]; frames_per_second = 24) where T <: AbstractFloat
     w = Widget()
     nvideos = length(videos)
-    nframes = length(first(videos))
+    nframes = size(first(videos), 3)
     timestep = Observable(w, "timestep", 1)
     unique_name = first(names)
     button = dom"button"(
