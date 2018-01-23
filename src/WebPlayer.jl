@@ -41,12 +41,11 @@ function video_player(video, name, width)
             frame = RGB{N0f8}.(Gray.(view(video, :, size(video, 2):-1:1, i)))
             write(io, frame)
         end
+        flush(io)
         close(io)
-        sleep(1)
+        wait(process)
         mp4path = joinpath(dir, "$(name).mp4")
         run(`ffmpeg -loglevel quiet -y -i $(path) -c:v libx264 -preset slow -crf 22 -pix_fmt yuv420p -c:a libvo_aacenc -b:a 128k -y $(mp4path)`)
-        sleep(2)
-        println(length(read(mp4path)))
         dom"video"(
             dom"source"(attributes = Dict(
                 :src => string("data:video/mp4;base64,", base64encode(read(mp4path))),
