@@ -3,7 +3,7 @@ module WebPlayer
 using Colors, FixedPointNumbers, CSSUtil, WebIO, InteractNext
 
 const set_play = js"""
-function set_play(name, nvideos){
+function set_play(name, nvideos, fps, nframes){
     var video;
     for(var i = 1; i <= nvideos; i++){
         video = document.getElementById(name + i);
@@ -11,6 +11,8 @@ function set_play(name, nvideos){
         if(video.paused){
             video.play();
             button.textContent = " ⏸ ";
+            var new_rate = (video.duration / nframes) / (1.0 / fps);
+            video.playbackRate = new_rate;
         }else{
             video.pause();
             button.textContent = " ▶ ";
@@ -31,21 +33,27 @@ function set_time(name, nvideos, val, nframes){
 }
 """
 
+
 function video_player(video, name, width)
     mktempdir() do dir
-        xdim, ydim, nframes = size(video)
-        frame = Matrix{RGB{N0f8}}(xdim, ydim)
+        _xdim, _ydim, nframes = size(video)
+        xdim = _xdim % 2 == 0 ? _xdim : _xdim + 1
+        ydim = _ydim % 2 == 0 ? _ydim : _ydim + 1
+        frame = fill(RGB{N0f8}(1, 1, 1), ydim, xdim)
         path = joinpath(dir, "$name.mkv")
-        io, process = open(`ffmpeg -loglevel quiet -f rawvideo -pixel_format rgb24 -r 24 -s:v $(xdim)x$(ydim) -i pipe:0 -vf vflip -y $path`, "w")
+        io, process = open(`ffmpeg -loglevel quiet -f rawvideo -pixel_format rgb24 -r 24 -s:v $(ydim)x$(xdim) -i pipe:0 -vf vflip -y $path`, "w")
         for i = 1:nframes
-            frame = RGB{N0f8}.(Gray.(view(video, :, size(video, 2):-1:1, i)))
+            for x in 1:_xdim, y in 1:_ydim
+                g = video[(_xdim + 1) - x, y, i]
+                frame[y, x] = RGB{N0f8}(g, g, g)
+            end
             write(io, frame)
         end
         flush(io)
         close(io)
         wait(process)
         mp4path = joinpath(dir, "$(name).mp4")
-        run(`ffmpeg -loglevel quiet -y -i $(path) -c:v libx264 -preset slow -crf 22 -pix_fmt yuv420p -c:a libvo_aacenc -b:a 128k -y $(mp4path)`)
+        run(`ffmpeg -loglevel quiet -i $(path) -c:v libx264 -preset slow -crf 22 -pix_fmt yuv420p -c:a libvo_aacenc -b:a 128k -y $(mp4path)`)
         dom"video"(
             dom"source"(attributes = Dict(
                 :src => string("data:video/mp4;base64,", base64encode(read(mp4path))),
@@ -67,7 +75,12 @@ function videobox(video, name, width)
     )
 end
 
-function playvideo(videos::Vector{Array{T, 3}}, names = ["video $i" for i = 1:length(videos)]; frames_per_second = 24, width = 500) where T <: AbstractFloat
+function playvideo(
+        videos::Vector{Array{T, 3}},
+        names = ["video $i" for i = 1:length(videos)];
+        frames_per_second = 24, width = 500
+    ) where T <: AbstractFloat
+    
     w = Widget()
     nvideos = length(videos)
     nframes = size(first(videos), 3)
@@ -78,7 +91,7 @@ function playvideo(videos::Vector{Array{T, 3}}, names = ["video $i" for i = 1:le
         id = "button",
         events = Dict(
             "click" => @js function ()
-                @var tnorm = $(set_play)($unique_name, $nvideos)
+                @var tnorm = $(set_play)($unique_name, $nvideos, $frames_per_second, $nframes)
                 $timestep[] = Math.round($(nframes) * tnorm)
                 return
             end),
