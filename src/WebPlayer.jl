@@ -120,10 +120,11 @@ function playvideo(
     nframes = size(first(videos), 3)
     init = Observable(widget, "timestep", false)
     headers = ()
-    unique_name = if names != nothing
+    vwidth = size(videos, 2)
+    unique_name, vwidth = if names != nothing
         w = size(videos, 2) ÷ length(names)
         headers = map(name-> dom"div"(name, style = Dict(:width => "$(w)px", :align => "center")), names)
-        first(names)
+        first(names), w * width
     end
     v = video_player(videos, unique_name, width, Dict(:width => "$(size(videos, 2))px", :controls => ""))
     ondependencies(widget, @js function ()
