@@ -125,7 +125,7 @@ function playvideo(
         headers = map(name-> dom"div"(name, style = Dict(:width => "$(w)px", :align => "center")), names)
         first(names)
     end
-    v = video_player(videos, unique_name, width, Dict(:controls => ""))
+    v = video_player(videos, unique_name, width, Dict(:width => "$(size(videos, 2))px", :controls => ""))
     ondependencies(widget, @js function ()
         @var video
         @var new_rate
