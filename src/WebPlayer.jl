@@ -34,7 +34,7 @@ function set_time(name, nvideos, val, nframes){
 """
 
 
-function video_player(video, name, width)
+function video_player(video, name, width, style = Dict())
     mktempdir() do dir
         _xdim, _ydim, nframes = size(video)
         xdim = _xdim % 2 == 0 ? _xdim : _xdim + 1
@@ -60,7 +60,7 @@ function video_player(video, name, width)
                 :type => "video/mp4",
             )),
             id = name,
-            attributes = Dict(:loop => "", :width => "100%")
+            attributes = merge(Dict(:loop => "", :width => "100%"), style)
         )
     end
 end
@@ -80,7 +80,7 @@ function playvideo(
         names = ["video $i" for i = 1:length(videos)];
         frames_per_second = 24, width = 500
     ) where T <: AbstractFloat
-    
+
     w = Widget()
     nvideos = length(videos)
     nframes = size(first(videos), 3)
@@ -108,7 +108,34 @@ function playvideo(
     vbox(hbox(w(button), s), hbox(videobox.(video_players, names, width)...))
 end
 
-export playvideo
 
+
+function playvideo(
+        videos::Array{T, 3}, names = nothing;
+        frames_per_second = 24, width = 500
+    ) where T <: AbstractFloat
+
+    widget = Widget()
+    nvideos = length(videos)
+    nframes = size(first(videos), 3)
+    init = Observable(widget, "timestep", false)
+    headers = ()
+    unique_name = if names != nothing
+        w = size(videos, 2) ÷ length(names)
+        headers = map(name-> dom"div"(name, style = Dict(:width => "$(w)px", :align => "center")), names)
+        first(names)
+    end
+    v = video_player(videos, unique_name, width, Dict(:controls => ""))
+    ondependencies(widget, @js function ()
+        @var video
+        @var new_rate
+        video = document.getElementById($unique_name);
+        new_rate = (1/24) / (1.0 / $frames_per_second);
+        video.playbackRate = new_rate;
+    end)
+    vbox(hbox(headers...), hbox(widget(v)))
+end
+
+export playvideo
 
 end # module
