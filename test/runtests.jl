@@ -10,8 +10,8 @@ end
 
 videos = [video video];
 
-x = WebPlayer.playvideo(videos, frames_per_second = 5)
+x = WebPlayer.playvideo(videos, ["test", "test"], frames_per_second = 5)
 
 w = Window()
 body!(w, x)
-tools(w)
+# tools(w)
