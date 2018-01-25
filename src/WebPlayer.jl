@@ -75,6 +75,17 @@ function videobox(video, name, width)
     )
 end
 
+
+"""
+    playvideo(
+        videos::Vector{Array{T, 3}}, names = ["video i" for i = 1:length(videos)];
+        frames_per_second = 24, width = 500
+    )
+
+Plays multiple videos side by side - names are optional and fall back to `video i`.
+You can change the playback speed by passing your favorite frame rate to `frames_per_second = rate`.
+One can also modify the width with the keyword argument `width = 500`.
+"""
 function playvideo(
         videos::Vector{Array{T, 3}},
         names = ["video $i" for i = 1:length(videos)];
@@ -108,34 +119,38 @@ function playvideo(
     vbox(hbox(w(button), s), hbox(videobox.(video_players, names, width)...))
 end
 
-
-
 function playvideo(
         videos::Array{T, 3}, names = nothing;
-        frames_per_second = 24, width = 500
+        kw_args...
     ) where T <: AbstractFloat
-
-    widget = Widget()
-    nvideos = length(videos)
-    nframes = size(first(videos), 3)
-    init = Observable(widget, "timestep", false)
-    headers = ()
-    vwidth = size(videos, 2)
-    unique_name = if names != nothing
-        w = vwidth ÷ length(names)
-        headers = map(name-> dom"div"(name, style = Dict(:width => "$(w)px", :align => "center")), names)
-        first(names)
-    end
-    v = video_player(videos, unique_name, width, Dict(:width => "$(vwidth)px", :controls => ""))
-    ondependencies(widget, @js function ()
-        @var video
-        @var new_rate
-        video = document.getElementById($unique_name);
-        new_rate = (1/24) / (1.0 / $frames_per_second);
-        video.playbackRate = new_rate;
-    end)
-    vbox(hbox(headers...), hbox(widget(v)))
+    error("You gave a single video to video player: $(typeof(videos)). To play a video use a vector of videos, e.g.: [video1, video2]")
 end
+# function playvideo(
+#         videos::Array{T, 3}, names = nothing;
+#         frames_per_second = 24, width = 500
+#     ) where T <: AbstractFloat
+#
+#     widget = Widget()
+#     nvideos = length(videos)
+#     nframes = size(first(videos), 3)
+#     init = Observable(widget, "timestep", false)
+#     headers = ()
+#     vwidth = size(videos, 2)
+#     unique_name = if names != nothing
+#         w = vwidth ÷ length(names)
+#         headers = map(name-> dom"div"(name, style = Dict(:width => "$(w)px", :align => "center")), names)
+#         first(names)
+#     end
+#     v = video_player(videos, unique_name, width, Dict(:width => "$(vwidth)px", :controls => ""))
+#     ondependencies(widget, @js function ()
+#         @var video
+#         @var new_rate
+#         video = document.getElementById($unique_name);
+#         new_rate = (1/24) / (1.0 / $frames_per_second);
+#         video.playbackRate = new_rate;
+#     end)
+#     vbox(hbox(headers...), hbox(widget(v)))
+# end
 
 export playvideo
 
