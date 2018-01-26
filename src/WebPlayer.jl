@@ -3,12 +3,10 @@ module WebPlayer
 using Colors, FixedPointNumbers, CSSUtil, WebIO, InteractNext
 
 const set_play = js"""
-function set_play(name, nvideos, fps, nframes, init){
+function set_play(name, nvideos, fps, nframes, init, callback){
     var video;
     var button = document.getElementById("button");
-    var callback = function(){
-        button.textContent = " ▶ ";
-    };
+
     for(var i = 1; i <= nvideos; i++){
         video = document.getElementById(name + i);
         if(video.paused){
@@ -107,7 +105,11 @@ function playvideo(
     timestep = Observable(w, "timestep", 1)
     initialized = Observable(w, "initialized", false)
     unique_name = first(names)
-
+    callback = @js function()
+        @var button = document.getElementById("button")
+        button.textContent = " ▶ "
+        $timestep[] = 1
+    end
     button = dom"button"(
         " ▶ ",
         id = "button",
@@ -115,7 +117,7 @@ function playvideo(
             "click" => @js function ()
                 @var tnorm = $(set_play)(
                     $unique_name, $nvideos, $frames_per_second,
-                    $nframes, $initialized[]
+                    $nframes, $initialized[], $callback
                 )
                 $initialized[] = false
                 $timestep[] = Math.round($(nframes) * tnorm)
