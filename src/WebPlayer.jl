@@ -3,16 +3,25 @@ module WebPlayer
 using Colors, FixedPointNumbers, CSSUtil, WebIO, InteractNext
 
 const set_play = js"""
-function set_play(name, nvideos, fps, nframes){
+function set_play(name, nvideos, fps, nframes, init){
     var video;
+    var button = document.getElementById("button");
+    var callback = function(){
+        button.textContent = " ▶ ";
+    };
     for(var i = 1; i <= nvideos; i++){
         video = document.getElementById(name + i);
-        var button = document.getElementById("button");
         if(video.paused){
             video.play();
+            if(!init){
+                if(i == 1 && !init){
+                    video.addEventListener('ended', callback);
+                }
+                var new_rate = (video.duration / nframes) / (1.0 / fps);
+                video.playbackRate = new_rate;
+            }
             button.textContent = " ⏸ ";
-            var new_rate = (video.duration / nframes) / (1.0 / fps);
-            video.playbackRate = new_rate;
+
         }else{
             video.pause();
             button.textContent = " ▶ ";
@@ -60,7 +69,7 @@ function video_player(video, name, width, style = Dict())
                 :type => "video/mp4",
             )),
             id = name,
-            attributes = merge(Dict(:loop => "", :width => "100%"), style)
+            attributes = merge(Dict(:width => "100%"), style)
         )
     end
 end
@@ -70,8 +79,8 @@ package_dir() = joinpath(@__DIR__, "..")
 
 function videobox(video, name, width)
     dom"div"(
-        vbox(dom"div"(name), video),
-        style = Dict(:outline => "1px solid #555", :width => "$(width)px", :padding => "0.5em")
+        vbox(dom"div"(name), dom"div"(video, style = Dict(:width => "$width"))),
+        style = Dict(:outline => "1px solid #555", :padding => "0.5em")
     )
 end
 
@@ -96,13 +105,19 @@ function playvideo(
     nvideos = length(videos)
     nframes = size(first(videos), 3)
     timestep = Observable(w, "timestep", 1)
+    initialized = Observable(w, "initialized", false)
     unique_name = first(names)
+
     button = dom"button"(
         " ▶ ",
         id = "button",
         events = Dict(
             "click" => @js function ()
-                @var tnorm = $(set_play)($unique_name, $nvideos, $frames_per_second, $nframes)
+                @var tnorm = $(set_play)(
+                    $unique_name, $nvideos, $frames_per_second,
+                    $nframes, $initialized[]
+                )
+                $initialized[] = false
                 $timestep[] = Math.round($(nframes) * tnorm)
                 return
             end),
@@ -125,32 +140,7 @@ function playvideo(
     ) where T <: AbstractFloat
     error("You gave a single video to video player: $(typeof(videos)). To play a video use a vector of videos, e.g.: [video1, video2]")
 end
-# function playvideo(
-#         videos::Array{T, 3}, names = nothing;
-#         frames_per_second = 24, width = 500
-#     ) where T <: AbstractFloat
-#
-#     widget = Widget()
-#     nvideos = length(videos)
-#     nframes = size(first(videos), 3)
-#     init = Observable(widget, "timestep", false)
-#     headers = ()
-#     vwidth = size(videos, 2)
-#     unique_name = if names != nothing
-#         w = vwidth ÷ length(names)
-#         headers = map(name-> dom"div"(name, style = Dict(:width => "$(w)px", :align => "center")), names)
-#         first(names)
-#     end
-#     v = video_player(videos, unique_name, width, Dict(:width => "$(vwidth)px", :controls => ""))
-#     ondependencies(widget, @js function ()
-#         @var video
-#         @var new_rate
-#         video = document.getElementById($unique_name);
-#         new_rate = (1/24) / (1.0 / $frames_per_second);
-#         video.playbackRate = new_rate;
-#     end)
-#     vbox(hbox(headers...), hbox(widget(v)))
-# end
+
 
 export playvideo
 
